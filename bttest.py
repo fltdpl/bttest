@@ -4,6 +4,8 @@ from time import sleep
 from select import select
 import configparser
 import random
+from threading import Thread
+
 
 
 def ConfigMap(section):
@@ -50,11 +52,11 @@ def timer_server(q):
 
 
 def send_data(socket):
-    typ = ConfigMap("sentdata")['typ']
-    path = ConfigMap("sentdata")['path']
-    sdata = ConfigMap("sentdata")['sent']
-    len_bytes = ConfigMap("sentdata")['bytes']
-    t_wait = ConfigMap("sentdata")['delay']
+    typ = ConfigMap("senddata")['typ']
+    path = ConfigMap("senddata")['path']
+    sdata = ConfigMap("senddata")['send']
+    len_bytes = ConfigMap("senddata")['bytes']
+    t_wait = ConfigMap("senddata")['delay']
     sdata_str = ""
     if typ == "random":
         hexpool = '0123456789abcdef'
@@ -85,14 +87,26 @@ def send_data(socket):
               "config.ini and, at least say 'yes' to random data!")
         exit()
 
-    printout = ConfigMap("printout")['printsent']
+    printout = ConfigMap("printout")['printsend']
     if printout == 'Hex':
-        print("[sent]     "+chr_to_hex(sdata_str))
+        print("[send]     "+chr_to_hex(sdata_str))
     else:
-        print("[sent]     "+sdata_str)
+        print("[send]     "+sdata_str)
 
     socket.send(sdata_str)
     sleep(float(t_wait))
+
+
+def read_data(socket):
+    readable, writable, exceptional = select([socket], [], [], 1)
+    if readable:
+        data = str(socket.recv(1024))
+        data = data[2:(len(data)-1)]
+        printout = ConfigMap("printout")['printresv']
+        if printout == 'Hex':
+            print("[Received] "+chr_to_hex(data))
+        else:
+            print("[Received] "+data)
 
 
 def chr_to_hex(data):
@@ -104,25 +118,19 @@ def chr_to_hex(data):
 
 def main():
     server_sock, client_sock = connect()
-#    client_sock = 1
+    s = Thread(target=send_data, args=(client_sock,))
     while True:
-        # Send Data
-        send_data(client_sock)
-
         # Read Data
-        readable, writable, exceptional = select([client_sock], [], [], 1)
-        if readable:
-            data = str(client_sock.recv(1024))
-            data = data[2:(len(data)-1)]
-            printout = ConfigMap("printout")['printresv']
-            if printout == 'Hex':
-                print("[Received] "+chr_to_hex(data))
-            else:
-                print("[Received] "+data)
+        read_data(client_sock)
+        # Send Data
+        if s.is_alive() is not True:
+            s = Thread(target=send_data, args=(client_sock,))
+            s.start()
 
     print("disconnected")
     client_sock.close()
     server_sock.close()
+
 
 if __name__ == "__main__":
     main()
