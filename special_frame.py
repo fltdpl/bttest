@@ -5,7 +5,7 @@ def special_frame():
     TK = str(randint(0, 9)) + str(randint(0, 9))
     TB = str(randint(0, 9)) + str(randint(0, 9))
     ST = str(0) + str(randint(0, 1))
-    PH = str(0) + str(randint(0, 7))
+    PH = str(0) + str(randint(1, 6))
     charframe = chr(int('43', 16)) + \
         chr(int('41', 16)) + \
         chr(int('4e', 16)) + \

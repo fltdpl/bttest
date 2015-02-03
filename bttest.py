@@ -5,7 +5,7 @@ from select import select
 import configparser
 import random
 from threading import Thread
-
+from time import strftime
 
 
 def ConfigMap(section):
@@ -28,27 +28,17 @@ def connect():
     server_sock = bt.BluetoothSocket(bt.RFCOMM)
     server_sock.bind(("", bt.PORT_ANY))
     server_sock.listen(1)
-
     port = server_sock.getsockname()[1]
     uuid = "00001101-0000-1000-8000-00805F9B34FB"
-
     bt.advertise_service(server_sock, "TestServer",
                          service_id=uuid,
                          service_classes=[uuid, bt.SERIAL_PORT_CLASS],
                          profiles=[bt.SERIAL_PORT_PROFILE]
                          )
-
-    print("Waiting for connection on RFCOMM channel %d" % port)
-
+    print("Waiting for connection on RFCOMM port %d" % port)
     client_sock, client_info = server_sock.accept()
     print("Accepted connection from ", client_info)
-
     return server_sock, client_sock
-
-
-def timer_server(q):
-    sleep(15)
-    q.put("sleep")
 
 
 def send_data(socket):
@@ -73,7 +63,6 @@ def send_data(socket):
         else:
             print("There is no data in config.ini")
             exit()
-
     elif typ == "path":
         if path:
             func = __import__(path)
@@ -81,17 +70,14 @@ def send_data(socket):
         else:
             print("There is no path in config.ini")
             exit()
-
+    elif typ == "timestamp":
+        sdata_str = strftime("%x / %X")
     else:
         print("If you don't set data for sending in your " +
               "config.ini and, at least say 'yes' to random data!")
         exit()
 
-    printout = ConfigMap("printout")['printsend']
-    if printout == 'Hex':
-        print("[send]     "+chr_to_hex(sdata_str))
-    else:
-        print("[send]     "+sdata_str)
+    termprint("send", sdata_str)
 
     socket.send(sdata_str)
     sleep(float(t_wait))
@@ -102,11 +88,26 @@ def read_data(socket):
     if readable:
         data = str(socket.recv(1024))
         data = data[2:(len(data)-1)]
+        termprint("recv", data)
+
+
+def termprint(typ, data):
+    stamp = strftime("%X")
+    if typ == "send":
+        printout = ConfigMap("printout")['printsend']
+        if printout == 'Hex':
+            print("["+stamp+" // send] "+chr_to_hex(data))
+        elif printout == 'ASCII':
+            print("["+stamp+" // send] "+data)
+        else:
+            print("Check printsend / printout in the config.ini")
+            exit()
+    if typ == "recv":
         printout = ConfigMap("printout")['printresv']
         if printout == 'Hex':
-            print("[Received] "+chr_to_hex(data))
+            print("["+stamp+" // resv] "+chr_to_hex(data))
         else:
-            print("[Received] "+data)
+            print("["+stamp+" // resv] "+data)
 
 
 def chr_to_hex(data):
@@ -126,10 +127,6 @@ def main():
         if s.is_alive() is not True:
             s = Thread(target=send_data, args=(client_sock,))
             s.start()
-
-    print("disconnected")
-    client_sock.close()
-    server_sock.close()
 
 
 if __name__ == "__main__":
